@@ -1,35 +1,43 @@
-import sounddevice as sd
+#!/usr/bin/env python3
+"""
+Microphone listener service - captures audio and transcribes locally
+"""
 import numpy as np
-import whisper
-from datetime import datetime
+import sounddevice as sd
+from faster_whisper import WhisperModel
+import torch
 
-MODEL_NAME = "base"  # You can use "tiny", "small", "medium", "large" as needed
+# Initialize GPU-accelerated Whisper
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"🚀 Loading Whisper model on {device.upper()}...")
+model = WhisperModel("base.en", device=device, compute_type="float16" if device == "cuda" else "int8")
 
-def log(msg):
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
+def transcribe_audio_file(audio_path):
+    """
+    Transcribe an audio file to text.
+    
+    Args:
+        audio_path: Path to audio file
+    
+    Returns:
+        str: Transcribed text
+    """
+    segments, _ = model.transcribe(audio_path, language="en")
+    return " ".join([seg.text for seg in segments]).strip()
 
-def listen_and_transcribe(samplerate=16000, chunk_duration=5):
-    log(f"Loading Whisper model '{MODEL_NAME}'...")
-    model = whisper.load_model(MODEL_NAME)
-    log("Whisper model loaded. Continuous listening...")
-
-    try:
-        with sd.InputStream(samplerate=samplerate, channels=1, dtype='float32') as stream:
-            while True:
-                log("Listening...")
-                audio = stream.read(int(chunk_duration * samplerate))[0]
-                audio = np.squeeze(audio)
-                audio = whisper.pad_or_trim(audio)
-                mel = whisper.log_mel_spectrogram(audio)
-                if model.device.type == "cuda":
-                    mel = mel.to(model.device)
-                options = whisper.DecodingOptions(language="en", fp16=False)
-                result = whisper.decode(model, mel, options)
-                text = result.text.strip()
-                if text:
-                    log(f"Recognized: {text}")
-    except KeyboardInterrupt:
-        log("Stopped by user.")
+def main():
+    """Simple test - transcribe command line audio file"""
+    import sys
+    
+    if len(sys.argv) < 2:
+        print("Usage: python mic-listener.py <audio_file>")
+        sys.exit(1)
+    
+    audio_file = sys.argv[1]
+    print(f"📝 Transcribing: {audio_file}")
+    
+    result = transcribe_audio_file(audio_file)
+    print(f"\n[TRANSCRIPT]\n{result}")
 
 if __name__ == "__main__":
-    listen_and_transcribe()
+    main()
