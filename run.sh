@@ -1,4 +1,5 @@
 #!/bin/bash
+
 set -e
 
 # Create .venv if it doesn't exist
@@ -13,5 +14,18 @@ source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# Run the app
-python main.py
+
+
+
+echo "Select an option:"
+echo "1) Run mic listener"
+read -p "Enter choice [1]: " choice
+
+case $choice in
+	1|"")
+		python services/mic-listener.py
+		;;
+	*)
+		echo "Invalid option."
+		;;
+esac
